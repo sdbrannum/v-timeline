@@ -11,22 +11,21 @@ const chartRef: Ref<HTMLDivElement | null> = ref(null);
 
 const scrollAreaRef: Ref<SVGRectElement | null> = ref(null);
 const onScroll = (scrollEvent: WheelEvent) => {
-    console.log('on scroll ', scrollEvent)
-    // const normalizeBasis = () => {
-    //     if (xTickSpacing.value > X_SPACING_MAX) {
-    //         xTickSpacing.value = X_SPACING_MIN;
-    //         // TODO: change labelType
-    //     } else if (xTickSpacing.value < X_SPACING_MIN) {
-    //         xTickSpacing.value = X_SPACING_MAX;
-    //         // TODO: change labelType
-    //     }
-    // }
-    // if (scrollEvent.deltaY > 0) {
-    //     window.requestAnimationFrame(() => xTickSpacing.value -= 1);
-    // } else {
-    //     window.requestAnimationFrame(() => xTickSpacing.value += 1);
-    // }
-    // normalizeBasis();
+    const normalizeBasis = () => {
+        if (xTickSpacing.value > X_SPACING_MAX) {
+            xTickSpacing.value = X_SPACING_MIN;
+            // TODO: change labelType
+        } else if (xTickSpacing.value < X_SPACING_MIN) {
+            xTickSpacing.value = X_SPACING_MAX;
+            // TODO: change labelType
+        }
+    }
+    if (scrollEvent.deltaY > 0) {
+        window.requestAnimationFrame(() => xTickSpacing.value -= 1);
+    } else {
+        window.requestAnimationFrame(() => xTickSpacing.value += 1);
+    }
+    normalizeBasis();
 }
 
 interface Tick {
@@ -62,7 +61,6 @@ const xAxis: ComputedRef<Tick[]> = computed(() => {
         label: d.getFullYear() + idx + '',
     }));
 
-    console.log(startDate.value, 'computed xAxis', d);
     return d;
 });
 
@@ -75,11 +73,19 @@ const onBrowserResize = () => {
 let mouseDown = false;
 let mouseDownPosition = 0;
 
-const onMouseDown = (mouseEvent: MouseEvent) => { mouseDown = true; mouseDownPosition = mouseEvent.pageX; }
+const onMouseDown = (mouseEvent: MouseEvent) => {
+    mouseEvent.preventDefault();
+    mouseDown = true;
+    mouseDownPosition = mouseEvent.pageX;
+}
 const onMouseUp = (mouseEvent: MouseEvent) => { mouseDown = false; }
-const onMouseLeave = (mouseEvent: MouseEvent) => { mouseDown = false; }
+// const onMouseLeave = (mouseEvent: MouseEvent) => { 
+//     mouseDown = false; 
+// }
 
 const onMouseMove = (mouseEvent: MouseEvent) => {
+    mouseEvent.preventDefault();
+    console.log('mouseDown', mouseDown);
     if (mouseDown) {
         window.requestAnimationFrame(() => {
             translateStart.value -= mouseDownPosition - mouseEvent.pageX;
@@ -102,6 +108,8 @@ const onDrag = () => {
 
 onMounted(() => {
     window.addEventListener('resize', onBrowserResize);
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
     onBrowserResize();
     if (scrollAreaRef.value) {
         scrollAreaRef.value.addEventListener('wheel', onScroll);
@@ -110,6 +118,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     window.removeEventListener('resize', onBrowserResize);
+    window.removeEventListener('mousedown', onMouseDown);
+    window.removeEventListener('mouseup', onMouseUp);
     if (scrollAreaRef.value) {
         scrollAreaRef.value.addEventListener('wheel', onScroll);
     }
@@ -132,9 +142,6 @@ onBeforeUnmount(() => {
                 x="150"
                 y="0"
                 fill="#529fca"
-                @mousedown="onMouseDown"
-                @mouseup="onMouseUp"
-                @mouseleave="onMouseLeave"
                 @mousemove="onMouseMove"
                 @drag="onDrag"
                 ref="scrollAreaRef"
