@@ -30,8 +30,8 @@ const onScroll = (scrollEvent: WheelEvent) => {
 }
 
 interface Tick {
-    x: Number;
-    label: String;
+    x: number;
+    label: string;
 }
 
 let xTickSpacing = ref(150);
@@ -44,16 +44,26 @@ const tickCount = computed(() => {
 });
 
 enum LabelTypes { Month, Year, Week, Day };
-const startDate = ref(new Date());
 const labelType = computed(() => LabelTypes.Year);
+const startDate = ref(new Date());
+
+const adjustStartDate = (val: number) => {
+    const newDate = new Date(startDate.value);
+    newDate.setFullYear(newDate.getFullYear() + val);
+    startDate.value = newDate;
+}
 
 const translateStart = ref(0);
 const xAxis: ComputedRef<Tick[]> = computed(() => {
-    let yearOffset = -Math.floor(tickCount.value / 2);
-    return new Array(tickCount.value).fill(startDate.value).map((d, idx) => ({
+
+    // let yearOffset = -Math.floor(tickCount.value / 2);
+    const d = new Array(tickCount.value).fill(startDate.value).map((d, idx) => ({
         x: xTickSpacing.value * (idx + 1) + translateStart.value,
-        label: d.getFullYear() + yearOffset++ + ''
+        label: d.getFullYear() + idx + '',
     }));
+
+    console.log(startDate.value, 'computed xAxis', d);
+    return d;
 });
 
 const onBrowserResize = () => {
@@ -68,22 +78,21 @@ let mouseDownPosition = 0;
 const onMouseDown = (mouseEvent: MouseEvent) => { mouseDown = true; mouseDownPosition = mouseEvent.pageX; }
 const onMouseUp = (mouseEvent: MouseEvent) => { mouseDown = false; }
 const onMouseLeave = (mouseEvent: MouseEvent) => { mouseDown = false; }
+
 const onMouseMove = (mouseEvent: MouseEvent) => {
-    console.log('mouse move', mouseEvent)
     if (mouseDown) {
         window.requestAnimationFrame(() => {
             translateStart.value -= mouseDownPosition - mouseEvent.pageX;
             mouseDownPosition = mouseEvent.pageX;
-        });
-        // const difference = Math.abs(mouseDownPosition - mouseEvent.pageX);
-        // if (mouseEvent.pageX >= mouseDownPosition) {
-        //     // console.log('one')
-        //     translateStart.value += (mouseDownPosition - mouseEvent.pageX);
-        // } else {
-        //     // console.log('two')
-        //     translateStart.value -= (mouseDownPosition - mouseEvent.pageX);
-        // }
 
+            if (translateStart.value > xTickSpacing.value) {
+                translateStart.value = 0;
+                adjustStartDate(-1);
+            } else if (translateStart.value < 0) {
+                translateStart.value = 150;
+                adjustStartDate(1);
+            }
+        });
     }
 }
 
@@ -135,7 +144,7 @@ onBeforeUnmount(() => {
                 <g
                     class="tick"
                     v-for="(tick, idx) in xAxis"
-                    :key="idx"
+                    :key="tick.label"
                     :style="{ transform: `translateX(${tick.x}px)` }"
                 >
                     <line y1="-1.5em" y2="-300" stroke="var(--stroke-color)" />
