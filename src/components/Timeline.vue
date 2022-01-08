@@ -10,56 +10,50 @@ const chartWidth = ref(0);
 const chartRef: Ref<HTMLDivElement | null> = ref(null);
 
 const scrollAreaRef: Ref<SVGRectElement | null> = ref(null);
-const onScroll = (scrollEvent: Event) => {
+const onScroll = (scrollEvent: WheelEvent) => {
     console.log('on scroll ', scrollEvent)
+    // const normalizeBasis = () => {
+    //     if (xTickSpacing.value > X_SPACING_MAX) {
+    //         xTickSpacing.value = X_SPACING_MIN;
+    //         // TODO: change labelType
+    //     } else if (xTickSpacing.value < X_SPACING_MIN) {
+    //         xTickSpacing.value = X_SPACING_MAX;
+    //         // TODO: change labelType
+    //     }
+    // }
+    // if (scrollEvent.deltaY > 0) {
+    //     window.requestAnimationFrame(() => xTickSpacing.value -= 1);
+    // } else {
+    //     window.requestAnimationFrame(() => xTickSpacing.value += 1);
+    // }
+    // normalizeBasis();
 }
-
-let last_known_scroll_position = 0;
-let ticking = false;
-
 
 interface Tick {
     x: Number;
     label: String;
 }
 
-enum LabelTypes { Month, Year, Day };
+let xTickSpacing = ref(150);
+const X_SPACING_MIN = 100, X_SPACING_MAX = 200;
+
+const tickCount = computed(() => {
+    const bodyPos = document.body.getBoundingClientRect();
+    const pos = scrollAreaRef.value?.getBoundingClientRect() || { width: 0 };
+    return Math.floor((pos.width + xTickSpacing.value) / xTickSpacing.value);
+});
+
+enum LabelTypes { Month, Year, Week, Day };
 const startDate = ref(new Date());
 const labelType = computed(() => LabelTypes.Year);
 
-const labels = computed(() => {
-    let yearOffset = -Math.ceil(ticks.value.length / 2);
-    return new Array(ticks.value.length).fill(startDate.value).map(d => d.getFullYear() + yearOffset++);
-});
-
-const getTickSpacing = () => {
-    const bodyPos = document.body.getBoundingClientRect();
-    const pos = scrollAreaRef.value?.getBoundingClientRect() || { width: 0 };
-    // 12 will change based on zoom level
-    return pos.width / 12;
-}
-
-let xBasis = ref(150);
-const ticks = computed(() => {
-    const res = [];
-    if (scrollAreaRef.value) {
-        const bodyPos = document.body.getBoundingClientRect();
-        const pos = scrollAreaRef.value.getBoundingClientRect();
-        let w = pos.width;
-        let lastX = 0;
-        let idx = 0;
-        const spacing = getTickSpacing();
-        while (w > 0) {
-            lastX = (pos.left - bodyPos.left) + (idx++ * spacing) - 2;
-            res.push(lastX)
-            w -= spacing;
-        }
-    }
-    return res;
-});
-
+const translateStart = ref(0);
 const xAxis: ComputedRef<Tick[]> = computed(() => {
-    return ticks.value.map((x, idx) => ({ x, label: labels.value[idx] }));
+    let yearOffset = -Math.floor(tickCount.value / 2);
+    return new Array(tickCount.value).fill(startDate.value).map((d, idx) => ({
+        x: xTickSpacing.value * (idx + 1) + translateStart.value,
+        label: d.getFullYear() + yearOffset++ + ''
+    }));
 });
 
 const onBrowserResize = () => {
@@ -68,7 +62,6 @@ const onBrowserResize = () => {
 }
 
 
-const firstXPosition = ref(0);
 let mouseDown = false;
 let mouseDownPosition = 0;
 
@@ -76,20 +69,31 @@ const onMouseDown = (mouseEvent: MouseEvent) => { mouseDown = true; mouseDownPos
 const onMouseUp = (mouseEvent: MouseEvent) => { mouseDown = false; }
 const onMouseLeave = (mouseEvent: MouseEvent) => { mouseDown = false; }
 const onMouseMove = (mouseEvent: MouseEvent) => {
+    console.log('mouse move', mouseEvent)
     if (mouseDown) {
-        if (mouseEvent.pageX >= mouseDownPosition) {
-            window.requestAnimationFrame(() => xBasis.value += 1);
-        } else {
-            window.requestAnimationFrame(() => xBasis.value -= 1);
-        }
-        mouseDownPosition = mouseEvent.pageX;
+        window.requestAnimationFrame(() => {
+            translateStart.value -= mouseDownPosition - mouseEvent.pageX;
+            mouseDownPosition = mouseEvent.pageX;
+        });
+        // const difference = Math.abs(mouseDownPosition - mouseEvent.pageX);
+        // if (mouseEvent.pageX >= mouseDownPosition) {
+        //     // console.log('one')
+        //     translateStart.value += (mouseDownPosition - mouseEvent.pageX);
+        // } else {
+        //     // console.log('two')
+        //     translateStart.value -= (mouseDownPosition - mouseEvent.pageX);
+        // }
+
     }
+}
+
+const onDrag = () => {
+    console.log('dragging')
 }
 
 onMounted(() => {
     window.addEventListener('resize', onBrowserResize);
     onBrowserResize();
-    generateTicks();
     if (scrollAreaRef.value) {
         scrollAreaRef.value.addEventListener('wheel', onScroll);
     }
@@ -123,6 +127,7 @@ onBeforeUnmount(() => {
                 @mouseup="onMouseUp"
                 @mouseleave="onMouseLeave"
                 @mousemove="onMouseMove"
+                @drag="onDrag"
                 ref="scrollAreaRef"
             />
             <line x1="150" x2="150" y1="0" y2="100%" stroke="var(--stroke-color)" stroke-width="2" />
@@ -169,6 +174,10 @@ onBeforeUnmount(() => {
     transform: translate(0, 100%);
 }
 
+.tick {
+    will-change: transform;
+    transition: linear;
+}
 .tick--label {
     text-anchor: middle;
 }
