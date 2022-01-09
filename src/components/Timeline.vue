@@ -5,27 +5,42 @@ import { ref, Ref, computed, ComputedRef, onMounted, onBeforeUnmount } from 'vue
 const truncateText = (ref: Ref<any>, width: number) => {
     console.log('');
 }
-
+const X_TRANSLATE_MIN = 150;
 const chartWidth = ref(0);
 const chartRef: Ref<HTMLDivElement | null> = ref(null);
 
 const scrollAreaRef: Ref<SVGRectElement | null> = ref(null);
 const onScroll = (scrollEvent: WheelEvent) => {
-    const normalizeBasis = () => {
-        if (xTickSpacing.value > X_SPACING_MAX) {
-            xTickSpacing.value = X_SPACING_MIN;
-            // TODO: change labelType
-        } else if (xTickSpacing.value < X_SPACING_MIN) {
-            xTickSpacing.value = X_SPACING_MAX;
-            // TODO: change labelType
+    const check = () => {
+        const x = getX(0);
+        if (x < 150) {
+            // adjustStartDate(1);
+            translateStart.value += xTickSpacing.value;
+            normalizeTranslateStart();
+        } else if (x > X_TRANSLATE_MIN + xTickSpacing.value) {
+            console.log('hit')
+            // adjustStartDate(-1);
+            translateStart.value -= xTickSpacing.value;
+            normalizeTranslateStart();
         }
+        console.log('x', x)
     }
+
+
     if (scrollEvent.deltaY > 0) {
-        window.requestAnimationFrame(() => xTickSpacing.value -= 1);
+        window.requestAnimationFrame(() => {
+            xTickSpacing.value -= 1;
+            check();
+        });
     } else {
-        window.requestAnimationFrame(() => xTickSpacing.value += 1);
+        window.requestAnimationFrame(() => {
+            xTickSpacing.value += 1
+            check();
+        });
     }
-    normalizeBasis();
+
+
+    // normalizeBasis();
 }
 
 interface Tick {
@@ -52,12 +67,15 @@ const adjustStartDate = (val: number) => {
     startDate.value = newDate;
 }
 
-const translateStart = ref(0);
-const xAxis: ComputedRef<Tick[]> = computed(() => {
+const translateStart = ref(X_TRANSLATE_MIN);
+const getX = (idx: number) => {
+    return translateStart.value + xTickSpacing.value * idx;
+};
 
+const xAxis: ComputedRef<Tick[]> = computed(() => {
     // let yearOffset = -Math.floor(tickCount.value / 2);
     const d = new Array(tickCount.value).fill(startDate.value).map((d, idx) => ({
-        x: xTickSpacing.value * (idx + 1) + translateStart.value,
+        x: getX(idx),
         label: d.getFullYear() + idx + '',
     }));
 
@@ -66,7 +84,6 @@ const xAxis: ComputedRef<Tick[]> = computed(() => {
 
 const onBrowserResize = () => {
     chartWidth.value = chartRef.value?.getBoundingClientRect().width || 0;
-    console.log(scrollAreaRef.value?.getBoundingClientRect().width);
 }
 
 
@@ -79,34 +96,42 @@ const onMouseDown = (mouseEvent: MouseEvent) => {
     mouseDownPosition = mouseEvent.pageX;
 }
 const onMouseUp = (mouseEvent: MouseEvent) => { mouseDown = false; }
-// const onMouseLeave = (mouseEvent: MouseEvent) => { 
-//     mouseDown = false; 
+// const onMouseLeave = (mouseEvent: MouseEvent) => {
+//     mouseDown = false;
 // }
+
+const normalizeTranslateStart = () => {
+    if (translateStart.value > (X_TRANSLATE_MIN + xTickSpacing.value)) {
+        adjustStartDate(-1);
+        translateStart.value = X_TRANSLATE_MIN;
+
+    } else if (translateStart.value < X_TRANSLATE_MIN) {
+        adjustStartDate(1);
+        translateStart.value = X_TRANSLATE_MIN + xTickSpacing.value;
+
+    }
+}
 
 const onMouseMove = (mouseEvent: MouseEvent) => {
     mouseEvent.preventDefault();
-    console.log('mouseDown', mouseDown);
     if (mouseDown) {
         window.requestAnimationFrame(() => {
-            translateStart.value -= mouseDownPosition - mouseEvent.pageX;
+            const moveX = mouseDownPosition - mouseEvent.pageX;
+            translateStart.value -= moveX;
             mouseDownPosition = mouseEvent.pageX;
 
-            if (translateStart.value > xTickSpacing.value) {
-                translateStart.value = 0;
-                adjustStartDate(-1);
-            } else if (translateStart.value < 0) {
-                translateStart.value = 150;
-                adjustStartDate(1);
-            }
+            normalizeTranslateStart();
         });
     }
 }
 
-const onDrag = () => {
-    console.log('dragging')
-}
+const getTranslate = () => translateStart.value;
+const getTickSpacing = () => xTickSpacing.value;
 
 onMounted(() => {
+    window.getX = getX;
+    window.getTranslate = getTranslate;
+    window.getTickSpacing = getTickSpacing;
     window.addEventListener('resize', onBrowserResize);
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
@@ -143,7 +168,6 @@ onBeforeUnmount(() => {
                 y="0"
                 fill="#529fca"
                 @mousemove="onMouseMove"
-                @drag="onDrag"
                 ref="scrollAreaRef"
             />
             <line x1="150" x2="150" y1="0" y2="100%" stroke="var(--stroke-color)" stroke-width="2" />
@@ -163,7 +187,7 @@ onBeforeUnmount(() => {
             </g>
         </svg>
     </div>
-</template> 
+</template>
 
 <style scoped>
 .timeline-chart {
