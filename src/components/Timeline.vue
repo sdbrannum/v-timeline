@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { ref, Ref, computed, ComputedRef, onMounted, onBeforeUnmount } from 'vue';
+import { ref, Ref, computed, ComputedRef, onMounted, onBeforeUnmount, defineProps } from 'vue';
 
+const props = defineProps({
+    scrollAceleration: {
+        type: Number,
+        default: 2
+    }
+})
 
 const truncateText = (ref: Ref<any>, width: number) => {
     console.log('');
@@ -11,31 +17,27 @@ const chartRef: Ref<HTMLDivElement | null> = ref(null);
 
 const scrollAreaRef: Ref<SVGRectElement | null> = ref(null);
 const onScroll = (scrollEvent: WheelEvent) => {
-    const check = () => {
-        const x = getX(0);
-        if (x < 150) {
-            // adjustStartDate(1);
-            translateStart.value += xTickSpacing.value;
-            normalizeTranslateStart();
-        } else if (x > X_TRANSLATE_MIN + xTickSpacing.value) {
-            console.log('hit')
-            // adjustStartDate(-1);
-            translateStart.value -= xTickSpacing.value;
-            normalizeTranslateStart();
-        }
-        console.log('x', x)
-    }
-
+    // const check = () => {
+    //     if (translateStart.value < X_TRANSLATE_MIN) {
+    //         adjustStartDate(1);
+    //         translateStart.value = X_TRANSLATE_MIN + xTickSpacing.value;
+    //     }
+    //     // else if (translateStart.value > X_TRANSLATE_MIN + xTickSpacing.value) {
+    //     //     adjustStartDate(1);
+    //     // }
+    // }
 
     if (scrollEvent.deltaY > 0) {
         window.requestAnimationFrame(() => {
-            xTickSpacing.value -= 1;
-            check();
+            xTickSpacing.value -= props.scrollAceleration;
+            // translateStart.value -= props.scrollAceleration;
+            // check();
         });
     } else {
         window.requestAnimationFrame(() => {
-            xTickSpacing.value += 1
-            check();
+            xTickSpacing.value += props.scrollAceleration;
+            // translateStart.value += props.scrollAceleration;
+            // check();
         });
     }
 
@@ -62,6 +64,7 @@ const labelType = computed(() => LabelTypes.Year);
 const startDate = ref(new Date());
 
 const adjustStartDate = (val: number) => {
+    console.log('adjuting start date')
     const newDate = new Date(startDate.value);
     newDate.setFullYear(newDate.getFullYear() + val);
     startDate.value = newDate;
@@ -139,6 +142,8 @@ onMounted(() => {
     if (scrollAreaRef.value) {
         scrollAreaRef.value.addEventListener('wheel', onScroll);
     }
+    adjustStartDate(- Math.floor(tickCount.value / 2));
+
 });
 
 onBeforeUnmount(() => {
@@ -148,6 +153,7 @@ onBeforeUnmount(() => {
     if (scrollAreaRef.value) {
         scrollAreaRef.value.addEventListener('wheel', onScroll);
     }
+
 });
 
 </script>
